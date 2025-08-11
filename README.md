@@ -258,6 +258,18 @@ LIMIT 10;"
 docker system df -v
 ```
 
+### Kafka Retention Management
+```bash
+# Check topic storage usage
+docker exec redpanda-cdc du -sh /var/lib/redpanda/data/kafka/
+
+# Clean up initial load data (reduces 100GB+ to ~7GB)
+./configure-kafka-retention.sh
+
+# Monitor CDC lag during cleanup
+./monitor-cdc-lag.sh
+```
+
 ## 🚀 Production Considerations
 
 ### Scaling ClickHouse Horizontally
