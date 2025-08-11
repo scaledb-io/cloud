@@ -1,0 +1,139 @@
+datadir="/var/lib/proxysql"
+errorlog="/var/log/proxysql.log"
+
+admin_variables=
+{
+    admin_credentials="admin:admin"
+    mysql_ifaces="0.0.0.0:6032"
+}
+
+mysql_variables=
+{
+    threads=4
+    max_connections=2048
+    default_query_delay=0
+    default_query_timeout=36000000
+    have_compress=true
+    interfaces="0.0.0.0:6033"
+    default_schema="imdb"
+    stacksize=1048576
+    server_version="8.0.35-ProxySQL"
+    connect_timeout_server=10000
+    monitor_enabled=true
+    monitor_username="monitor"
+    monitor_password="monitor"
+    monitor_history=600000
+    monitor_connect_interval=60000
+    monitor_ping_interval=10000
+}
+
+# MySQL Servers Configuration
+mysql_servers =
+(
+    {
+        address="mysql-cdc"
+        port=3306
+        hostgroup=10
+        weight=1000
+        max_connections=100
+        comment="MySQL Primary - OLTP"
+    },
+    {
+        address="clickhouse-cdc"
+        port=9004
+        hostgroup=20
+        weight=1000
+        max_connections=100
+        comment="ClickHouse - OLAP"
+    }
+)
+
+# MySQL Users Configuration  
+mysql_users =
+(
+    {
+        username = "root"
+        password = "rootpassword"
+        default_hostgroup = 10
+        max_connections = 100
+        transaction_persistent = 1
+        active = 1
+    },
+    {
+        username = "proxyuser"
+        password = "proxypass123"
+        default_hostgroup = 10
+        max_connections = 100
+        transaction_persistent = 1
+        active = 1
+    }
+)
+
+# Intelligent Query Routing Rules
+mysql_query_rules =
+(
+    # Rule 1: Route Analytics queries to ClickHouse
+    {
+        rule_id=100
+        match_pattern="^SELECT.*\\b(COUNT|SUM|AVG|MIN|MAX|GROUP BY|HAVING)\\b"
+        destination_hostgroup=20
+        apply=1
+        comment="Analytics queries -> ClickHouse"
+    },
+    # Rule 2: Route queries with ANALYTICS hint to ClickHouse
+    {
+        rule_id=101
+        match_pattern=".*/\\*\\s*ANALYTICS\\s*\\*/.*"
+        destination_hostgroup=20
+        apply=1
+        comment="ANALYTICS hint -> ClickHouse"
+    },
+    # Rule 3: Route heavy JOINs with aggregation to ClickHouse
+    {
+        rule_id=102
+        match_pattern="^SELECT.*FROM.*JOIN.*\\b(COUNT|SUM|AVG|GROUP BY)\\b"
+        destination_hostgroup=20
+        apply=1
+        comment="Complex analytics JOINs -> ClickHouse"
+    },
+    # Rule 4: Route all DML to MySQL
+    {
+        rule_id=200
+        match_pattern="^(INSERT|UPDATE|DELETE|REPLACE)"
+        destination_hostgroup=10
+        apply=1
+        comment="All DML -> MySQL"
+    },
+    # Rule 5: Route DDL to MySQL
+    {
+        rule_id=201
+        match_pattern="^(CREATE|ALTER|DROP|TRUNCATE)"
+        destination_hostgroup=10
+        apply=1
+        comment="All DDL -> MySQL"
+    },
+    # Rule 6: Route transactions to MySQL
+    {
+        rule_id=202
+        match_pattern="^(BEGIN|COMMIT|ROLLBACK|START TRANSACTION|SET)"
+        destination_hostgroup=10
+        apply=1
+        comment="Transactions -> MySQL"
+    },
+    # Rule 7: Route point queries to MySQL
+    {
+        rule_id=203
+        match_pattern="^SELECT.*WHERE.*=.*LIMIT\\s+1$"
+        destination_hostgroup=10
+        apply=1
+        comment="Point queries -> MySQL"
+    },
+    # Rule 8: Default - route to MySQL
+    {
+        rule_id=999
+        match_pattern=".*"
+        destination_hostgroup=10
+        apply=1
+        comment="Default: route to MySQL"
+    }
+)

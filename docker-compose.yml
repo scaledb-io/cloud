@@ -1,0 +1,166 @@
+services:
+  # MySQL with CDC enabled
+  mysql:
+    build: ../.
+    container_name: mysql-cdc
+    hostname: mysql-cdc
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: imdb
+      MYSQL_USER: imdbuser
+      MYSQL_PASSWORD: imdbpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../init.db:/imdb-data:ro
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    command: >
+      --local-infile=1
+      --secure-file-priv=""
+      --max-allowed-packet=1G
+      --innodb-buffer-pool-size=4G
+      --innodb-log-file-size=1G
+      --innodb-flush-log-at-trx-commit=2
+      --innodb-doublewrite=0
+      --bulk-insert-buffer-size=256M
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --server-id=1
+      --gtid_mode=ON
+      --enforce-gtid-consistency=ON
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Redpanda (high-performance Kafka alternative)
+  redpanda:
+    image: redpandadata/redpanda:v24.2.1
+    container_name: redpanda-cdc
+    hostname: redpanda-cdc
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    command: >
+      redpanda start
+      --smp 2
+      --memory 4G
+      --reserve-memory 0M
+      --overprovisioned
+      --node-id 0
+      --kafka-addr PLAINTEXT://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      --advertise-kafka-addr PLAINTEXT://redpanda-cdc:29092,EXTERNAL://localhost:9092
+      --pandaproxy-addr 0.0.0.0:8082
+      --advertise-pandaproxy-addr localhost:8082
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Redpanda Console  
+  redpanda-console:
+    image: redpandadata/console:v2.3.8
+    container_name: redpanda-console
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: redpanda-cdc:29092
+    depends_on:
+      - redpanda
+    networks:
+      - cdc-network
+
+  # ClickHouse Analytics Database
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.11.1
+    container_name: clickhouse-cdc
+    hostname: clickhouse-cdc
+    ports:
+      - "9000:9000"   # Native client
+      - "8123:8123"   # HTTP interface  
+      - "9004:9004"   # MySQL interface
+    environment:
+      CLICKHOUSE_DB: imdb
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_PASSWORD: clickhouse123
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse-init:/docker-entrypoint-initdb.d
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--password", "clickhouse123", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Debezium Connect for CDC
+  debezium-connect:
+    image: quay.io/debezium/connect:2.4
+    container_name: debezium-cdc
+    hostname: debezium-cdc
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: redpanda-cdc:29092
+      GROUP_ID: debezium-cdc-group
+      CONFIG_STORAGE_TOPIC: debezium.configs
+      OFFSET_STORAGE_TOPIC: debezium.offsets
+      STATUS_STORAGE_TOPIC: debezium.status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: false
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: false
+    depends_on:
+      - mysql
+      - redpanda
+    networks:
+      - cdc-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ProxySQL for Intelligent Query Routing
+  proxysql:
+    image: proxysql/proxysql:2.7.1
+    container_name: proxysql-cdc
+    hostname: proxysql-cdc
+    ports:
+      - "6033:6033"  # MySQL interface
+      - "6032:6032"  # Admin interface
+    volumes:
+      - ./proxysql/proxysql.cnf:/etc/proxysql.cnf:ro
+      - proxysql-data:/var/lib/proxysql
+    depends_on:
+      - mysql
+      - clickhouse
+    networks:
+      - cdc-network
+    command: proxysql -f --initial -c /etc/proxysql.cnf
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-P", "6032", "-u", "admin", "-padmin", "-e", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql-data:
+  redpanda-data:
+  clickhouse-data:
+  proxysql-data:
+
+networks:
+  cdc-network:
+    driver: bridge
