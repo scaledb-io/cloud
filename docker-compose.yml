@@ -1,7 +1,7 @@
 services:
   # MySQL with CDC enabled
   mysql:
-    build: ../.
+    build: .
     container_name: mysql-cdc
     hostname: mysql-cdc
     environment:

@@ -66,8 +66,6 @@ done
 echo "🔄 Extracting files..."
 gunzip -k *.tsv.gz
 
-cd ../production-setup
-
 echo "
 ==========================================
 📤 Loading Data with Real-time CDC
