@@ -88,47 +88,7 @@ mysql_query_rules =
         apply=1
         comment="ANALYTICS hint -> ClickHouse"
     },
-    # Rule 3: Route heavy JOINs with aggregation to ClickHouse
-    {
-        rule_id=102
-        match_pattern="^SELECT.*FROM.*JOIN.*\\b(COUNT|SUM|AVG|GROUP BY)\\b"
-        destination_hostgroup=20
-        apply=1
-        comment="Complex analytics JOINs -> ClickHouse"
-    },
-    # Rule 4: Route all DML to MySQL
-    {
-        rule_id=200
-        match_pattern="^(INSERT|UPDATE|DELETE|REPLACE)"
-        destination_hostgroup=10
-        apply=1
-        comment="All DML -> MySQL"
-    },
-    # Rule 5: Route DDL to MySQL
-    {
-        rule_id=201
-        match_pattern="^(CREATE|ALTER|DROP|TRUNCATE)"
-        destination_hostgroup=10
-        apply=1
-        comment="All DDL -> MySQL"
-    },
-    # Rule 6: Route transactions to MySQL
-    {
-        rule_id=202
-        match_pattern="^(BEGIN|COMMIT|ROLLBACK|START TRANSACTION|SET)"
-        destination_hostgroup=10
-        apply=1
-        comment="Transactions -> MySQL"
-    },
-    # Rule 7: Route point queries to MySQL
-    {
-        rule_id=203
-        match_pattern="^SELECT.*WHERE.*=.*LIMIT\\s+1$"
-        destination_hostgroup=10
-        apply=1
-        comment="Point queries -> MySQL"
-    },
-    # Rule 8: Default - route to MySQL
+    # Default - route to MySQL
     {
         rule_id=999
         match_pattern=".*"
