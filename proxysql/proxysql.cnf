@@ -87,13 +87,5 @@ mysql_query_rules =
         destination_hostgroup=20
         apply=1
         comment="ANALYTICS hint -> ClickHouse"
-    },
-    # Default - route to MySQL
-    {
-        rule_id=999
-        match_pattern=".*"
-        destination_hostgroup=10
-        apply=1
-        comment="Default: route to MySQL"
     }
 )
