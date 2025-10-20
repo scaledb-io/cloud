@@ -13,7 +13,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ../init.db:/imdb-data:ro
+      - ./init.db:/imdb-data:ro
       - ./mysql-init:/docker-entrypoint-initdb.d
     command: >
       --local-infile=1
