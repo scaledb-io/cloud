@@ -65,6 +65,8 @@ graph TB
 - 8GB+ RAM available
 - 20GB+ disk space
 
+> 💡 **VS Code users:** open the repo and pick **Dev Containers: Reopen in Container** — the full CDC stack starts in the background, ports are forwarded automatically, and Redpanda Console pops open on `:8080`.
+
 ### 1. Deploy the Platform
 ```bash
 ./setup-production-cdc.sh
