@@ -1,0 +1,22 @@
+# Extends the project's docker-compose.yml with a small dev container so that
+# VS Code's "Reopen in Container" / "Clone Repository in Container Volume"
+# flows bring up the full CDC stack and attach a shell inside the same Docker
+# network. Doesn't change any of the data-plane services.
+
+services:
+  devbox:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    volumes:
+      - ../:/workspace:cached
+    # Keep the container alive for VS Code to attach a shell.
+    command: sleep infinity
+    # Join the same network as the rest of the stack so the dev shell can
+    # reach mysql-cdc / debezium-cdc / clickhouse-cdc / etc. by name.
+    networks:
+      - cdc-network
+    # We don't need devbox up before the other services — start it last.
+    depends_on:
+      - mysql-cdc
+      - clickhouse-cdc
+      - redpanda-cdc
+      - debezium-cdc

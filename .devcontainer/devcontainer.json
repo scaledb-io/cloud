@@ -1,0 +1,45 @@
+{
+  "name": "ScaleDB Cloud — CDC Pipeline",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.dev.yml"
+  ],
+  "service": "devbox",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+
+  // Surface the same ports docker-compose exposes — VS Code will offer to
+  // forward them when the container comes up.
+  "forwardPorts": [
+    3306,    // MySQL
+    8083,    // Debezium Connect REST
+    9092,    // Redpanda (external)
+    8080,    // Redpanda Console (browser UI)
+    8123,    // ClickHouse HTTP
+    9000,    // ClickHouse native
+    6033     // ProxySQL client port
+  ],
+  "portsAttributes": {
+    "3306":  { "label": "MySQL (source DB)" },
+    "8083":  { "label": "Debezium Connect API" },
+    "9092":  { "label": "Redpanda (Kafka API)" },
+    "8080":  { "label": "Redpanda Console", "onAutoForward": "openBrowser" },
+    "8123":  { "label": "ClickHouse HTTP" },
+    "9000":  { "label": "ClickHouse native" },
+    "6033":  { "label": "ProxySQL (routes OLTP↔OLAP)" }
+  },
+
+  // After the dev container starts, surface a one-liner pointing at the setup
+  // script so a first-time user knows what to run.
+  "postAttachCommand": "echo '\\n👋 Stack is up. To deploy the Debezium connectors and ClickHouse tables, run:\\n\\n   ./setup-production-cdc.sh\\n'",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "cweijan.vscode-database-client2",
+        "redhat.vscode-yaml"
+      ]
+    }
+  }
+}
